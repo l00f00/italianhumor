@@ -6,3 +6,4 @@ lxml
 tmdbv3api
 python-dotenv
 duckduckgo-search
+spacy

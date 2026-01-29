@@ -10,9 +10,19 @@ from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, JobQu
 from tmdbv3api import TMDb, Movie, TV, Discover
 from duckduckgo_search import DDGS
 
+import spacy
+
 # Setup Logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Load SpaCy model for Italian
+try:
+    nlp = spacy.load("it_core_news_sm")
+    logger.info("Modello SpaCy caricato correttamente.")
+except Exception as e:
+    logger.error(f"Errore caricamento SpaCy: {e}. Esegui: python -m spacy download it_core_news_sm")
+    nlp = None
 
 # Configuration
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -166,6 +176,41 @@ def get_poster_from_web(title):
     
     return None
 
+def ruin_title_with_nlp(title):
+    """
+    Uses SpaCy to analyze the title and insert 'nel culo' in a grammatically 'funnier' position.
+    """
+    if not nlp:
+        return f"{title} nel c*lo"
+
+    doc = nlp(title)
+    
+    # Strategy: Find the main noun or object and insert after it.
+    # 1. Look for the last NOUN in the sentence (often the subject or object).
+    # 2. If no NOUN, append at the end.
+    
+    tokens = list(doc)
+    insertion_index = -1
+    
+    # Iterate backwards to find the last significant noun
+    for i in range(len(tokens) - 1, -1, -1):
+        token = tokens[i]
+        if token.pos_ in ["NOUN", "PROPN"]: # Noun or Proper Noun
+            insertion_index = i
+            break
+    
+    if insertion_index != -1:
+        # Reconstruct string with insertion
+        new_title_parts = []
+        for i, token in enumerate(tokens):
+            new_title_parts.append(token.text_with_ws)
+            if i == insertion_index:
+                new_title_parts.append("nel c*lo ")
+        
+        return "".join(new_title_parts).strip()
+    
+    return f"{title} nel c*lo"
+
 def get_content_data():
     # 1. Try TMDB API first
     title, poster_url = get_random_movie_or_tv()
@@ -199,7 +244,9 @@ def get_content_data():
             title = "Errore Lettura"
             poster_url = None
 
-    ruined_title = f"{title} nel culo"
+    # Apply NLP Ruin Logic
+    ruined_title = ruin_title_with_nlp(title)
+    
     logger.info(f"Selected: {title} -> {ruined_title}")
     return title, ruined_title, poster_url
 

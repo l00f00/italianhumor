@@ -17,7 +17,9 @@ services:
     #   - nelculo_data:/app/data
       
     # Use the default command from Dockerfile, or just python main.py
-    command: python main.py
+    command: >
+      sh -c "python -m spacy download it_core_news_sm &&
+             python main.py"
 
 # volumes:
 #   nelculo_data:
