@@ -63,15 +63,17 @@ def remove_subscriber(chat_id):
 def get_random_movie_or_tv():
     """
     Fetches a random popular movie or TV show using TMDB API directly.
-    This gives access to 10000+ titles without storing them locally.
+    Only works if API Key is valid.
     """
+    if not TMDB_API_KEY:
+        return None, None
+        
     try:
         # Randomly choose between Movie and TV
         is_movie = random.choice([True, False])
         
         # Random page (popular content usually goes up to 500 pages)
-        # We can also use 'top_rated'
-        page = random.randint(1, 100) 
+        page = random.randint(1, 50) 
         
         if is_movie:
             movie = Movie()
@@ -87,7 +89,6 @@ def get_random_movie_or_tv():
             
             # Get High Res Poster
             if poster_path:
-                # 'original' size is the highest resolution available
                 poster_url = f"https://image.tmdb.org/t/p/original{poster_path}"
             else:
                 poster_url = None
@@ -96,25 +97,61 @@ def get_random_movie_or_tv():
             
     except Exception as e:
         logger.error(f"Error fetching from TMDB: {e}")
-        # Fallback to local
-        return "Film Sconosciuto", None
+        return None, None
 
-    return "Errore", None
+    return None, None
+
+def get_poster_from_scraping(title):
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+    try:
+        search_query = quote_plus(title)
+        url = f"https://www.themoviedb.org/search?query={search_query}"
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'lxml')
+        img_tag = soup.select_one("div.card div.image img.poster")
+        if not img_tag:
+            img_tag = soup.select_one(".results .card img")
+        if img_tag:
+            poster_url = img_tag.get('src') or img_tag.get('data-src')
+            if poster_url:
+                if poster_url.startswith('/'):
+                    poster_url = f"https://www.themoviedb.org{poster_url}"
+                poster_url = poster_url.replace("w220_and_h330_face", "original")
+                poster_url = poster_url.replace("w94_and_h141_bestv2", "original")
+                return poster_url
+    except Exception as e:
+        logger.error(f"Error scraping poster: {e}")
+    return None
 
 def get_content_data():
-    # Try TMDB first for infinite content
+    # 1. Try TMDB API first
     title, poster_url = get_random_movie_or_tv()
     
-    # Fallback to local files if API fails or returns nothing
-    if not title or title == "Errore":
-        logger.warning("TMDB failed, using local fallback")
+    # 2. Fallback to local files + Scraping
+    if not title:
+        logger.info("Using local content fallback")
         try:
-            with open('movies.json', 'r', encoding='utf-8') as f:
-                content = json.load(f)
-                title = random.choice(content)
-                poster_url = None # Scraping removed to keep it simple, or re-add if needed
-        except:
-            title = "Titolo di esempio"
+            content_list = []
+            if os.path.exists('movies.json'):
+                with open('movies.json', 'r', encoding='utf-8') as f:
+                    content_list.extend(json.load(f))
+            if os.path.exists('tv_series.json'):
+                with open('tv_series.json', 'r', encoding='utf-8') as f:
+                    content_list.extend(json.load(f))
+            
+            if content_list:
+                title = random.choice(content_list)
+                # Now scrape the poster for this local title
+                poster_url = get_poster_from_scraping(title)
+            else:
+                title = "Titolo Default"
+                poster_url = None
+        except Exception as e:
+            logger.error(f"Error reading local files: {e}")
+            title = "Errore Lettura"
             poster_url = None
 
     ruined_title = f"{title} nel c*lo"
