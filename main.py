@@ -253,6 +253,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode='Markdown')
 
+    # Notify Admin of new subscriber
+    if ADMIN_CHAT_ID and str(chat_id) != str(ADMIN_CHAT_ID):
+        try:
+            user = update.effective_user
+            username = f"@{user.username}" if user.username else "N/A"
+            full_name = user.full_name
+            admin_msg = (
+                f"🔔 *Nuovo Utente Iscritto!* 🔔\n\n"
+                f"👤 Nome: {full_name}\n"
+                f"🔗 Username: {username}\n"
+                f"🆔 ID: `{chat_id}`"
+            )
+            await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=admin_msg, parse_mode='Markdown')
+        except Exception as e:
+            logger.error(f"Failed to notify admin about new user: {e}")
+
 async def my_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     await context.bot.send_message(chat_id=chat_id, text=f"🆔 Il tuo ID è: `{chat_id}`", parse_mode='Markdown')
