@@ -3,4 +3,5 @@ Pillow
 python-telegram-bot[job-queue]
 beautifulsoup4
 lxml
+tmdbv3api
 python-dotenv
