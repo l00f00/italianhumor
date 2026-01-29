@@ -199,7 +199,7 @@ def get_content_data():
             title = "Errore Lettura"
             poster_url = None
 
-    ruined_title = f"{title} nel c*lo"
+    ruined_title = f"{title} nel culo"
     logger.info(f"Selected: {title} -> {ruined_title}")
     return title, ruined_title, poster_url
 
@@ -240,7 +240,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     add_subscriber(chat_id)
     msg = (
-        f"🍑 *Benvenuto in NelCuloBot!* 🍑\n\n"
+        f"🍑 *Benvenuto in NelCuloBot2!* 🍑\n\n"
         f"Preparati a vedere i grandi classici del cinema come non li hai mai visti (o sentiti) prima.\n"
         f"Pubblicherò un capolavoro rovinato ogni {INTERVAL_MINUTES} minuti.\n\n"
         "Tieniti forte! 🚀"
