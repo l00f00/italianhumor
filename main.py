@@ -21,6 +21,7 @@ INTERVAL_MINUTES = int(os.getenv("INTERVAL_MINUTES", "30"))
 INTERVAL_SECONDS = INTERVAL_MINUTES * 60
 LATEST_IMAGE_PATH = "current_post.jpg"
 SUBSCRIBERS_FILE = "subscribers.json"
+MOVIES_FILE = "italian_movies_list.json" # New file with 9900+ titles
 
 # TMDB Configuration
 # Using a public generic key or requires user key. 
@@ -166,40 +167,66 @@ def get_poster_from_web(title):
     
     return None
 
+def get_random_italian_title():
+    """
+    Loads titles from the massive local JSON list (scraped from Wikipedia).
+    Filters out titles with 'bambini', 'bimbi', etc.
+    """
+    if not os.path.exists(MOVIES_FILE):
+        logger.error(f"{MOVIES_FILE} not found! Fallback to TMDB.")
+        return None
+        
+    try:
+        with open(MOVIES_FILE, 'r', encoding='utf-8') as f:
+            movies = json.load(f)
+            
+        if not movies:
+            return None
+            
+        # Try to find a safe title
+        for _ in range(50): # Max 50 attempts
+            title = random.choice(movies)
+            
+            # 1. Clean title (remove " (film ...)")
+            clean_title = title.split(" (film")[0]
+            
+            # 2. Safety Filter
+            lower_title = clean_title.lower()
+            forbidden_words = ["bambin", "bimbi", "bimbo", "ragazzin", "piccol", "minori", "infanzia"]
+            if any(word in lower_title for word in forbidden_words):
+                logger.info(f"Skipped unsafe title: {clean_title}")
+                continue
+                
+            return clean_title
+            
+    except Exception as e:
+        logger.error(f"Error reading movies file: {e}")
+        
+    return None
+
 def get_content_data():
-    # 1. Try TMDB API first
-    title, poster_url = get_random_movie_or_tv()
+    # 1. Try Local Italian List first (Priority!)
+    title = get_random_italian_title()
+    poster_url = None
     
-    # 2. If we have a title but no poster, try Web Search (The "Simple" Fallback)
+    # 2. If local list failed, fallback to TMDB random
+    if not title:
+        logger.info("Local list failed/empty. Falling back to TMDB API random.")
+        title, poster_url = get_random_movie_or_tv()
+    
+    # 3. If we have a title (from local or TMDB) but no poster yet, search Web
     if title and not poster_url:
-        logger.info(f"TMDB failed to give poster for '{title}'. Trying Web Search...")
+        logger.info(f"Need poster for '{title}'. Searching Web...")
         poster_url = get_poster_from_web(title)
 
-    # 3. Fallback to local files + Web Search fallback
+    # 4. Ultimate Fallback
     if not title:
-        logger.info("Using local content fallback")
-        try:
-            content_list = []
-            if os.path.exists('movies.json'):
-                with open('movies.json', 'r', encoding='utf-8') as f:
-                    content_list.extend(json.load(f))
-            if os.path.exists('tv_series.json'):
-                with open('tv_series.json', 'r', encoding='utf-8') as f:
-                    content_list.extend(json.load(f))
-            
-            if content_list:
-                title = random.choice(content_list)
-                # Now scrape the poster for this local title using Web Search (better than scraping TMDB html)
-                poster_url = get_poster_from_web(title)
-            else:
-                title = "Titolo Default"
-                poster_url = None
-        except Exception as e:
-            logger.error(f"Error reading local files: {e}")
-            title = "Errore Lettura"
-            poster_url = None
+        title = "Titolo Default"
+        poster_url = None
 
-    ruined_title = f"{title} nel culo"
+    # Apply Simple Ruin Logic (Suffix only, safer)
+    ruined_title = f"{title} nel c*lo"
+    
     logger.info(f"Selected: {title} -> {ruined_title}")
     return title, ruined_title, poster_url
 
