@@ -14,8 +14,8 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 # Configuration
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "1227582427:AAFM__gwYUt3z3_XBBybUHCPs3JFxqU6bto")
-ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID", "160104002")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID")
 INTERVAL_MINUTES = int(os.getenv("INTERVAL_MINUTES", "30"))
 INTERVAL_SECONDS = INTERVAL_MINUTES * 60
 LATEST_IMAGE_PATH = "current_post.jpg"
@@ -232,21 +232,39 @@ async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 if __name__ == "__main__":
     if not TELEGRAM_TOKEN:
-        logger.error("Manca il TOKEN!")
+        logger.error("❌ ERRORE CRITICO: Variabile d'ambiente TELEGRAM_TOKEN mancante!")
+        logger.error("Assicurati di aver impostato TELEGRAM_TOKEN nel docker-compose o in Portainer.")
         exit(1)
-        
+    
+    # Masked token logging for debugging
+    masked_token = f"{TELEGRAM_TOKEN[:5]}...{TELEGRAM_TOKEN[-5:]}" if len(TELEGRAM_TOKEN) > 10 else "TOO_SHORT"
+    logger.info(f"Using Token: {masked_token}")
+
     if ADMIN_CHAT_ID:
         add_subscriber(ADMIN_CHAT_ID)
 
-    application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("id", my_id))
-    application.add_handler(CommandHandler("stop", stop))
-    application.add_handler(CommandHandler("force", force))
-    application.add_handler(CommandHandler("users", users))
-    application.add_handler(CommandHandler("restart", restart))
-    
-    application.job_queue.run_repeating(generate_and_broadcast, interval=INTERVAL_SECONDS, first=10, name='broadcast_job')
+    try:
+        application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+        
+        # Handlers
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("id", my_id))
+        application.add_handler(CommandHandler("stop", stop))
+        application.add_handler(CommandHandler("force", force))
+        application.add_handler(CommandHandler("users", users))
+        application.add_handler(CommandHandler("restart", restart))
+        
+        # Job Queue
+        if application.job_queue:
+            application.job_queue.run_repeating(generate_and_broadcast, interval=INTERVAL_SECONDS, first=10, name='broadcast_job')
+            logger.info(f"Job Queue avviata. Intervallo: {INTERVAL_MINUTES} minuti.")
+        else:
+            logger.error("JobQueue non disponibile! Assicurati di aver installato python-telegram-bot[job-queue]")
 
-    logger.info("Bot is polling...")
-    application.run_polling()
+        logger.info("Bot is polling... (Premi Ctrl+C per fermare)")
+        application.run_polling()
+        
+    except Exception as e:
+        logger.error(f"❌ ERRORE AVVIO BOT: {e}")
+        logger.error("Verifica che il token sia corretto e che non ci siano altri bot in esecuzione con lo stesso token.")
+        exit(1)
