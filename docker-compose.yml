@@ -6,9 +6,9 @@ services:
     restart: unless-stopped
     # ports:
     #   - "5000:5000" # Flask rimosso, non serve esporre porte
-    env_file:
-      - .env
-      - stack.env
+    # env_file:
+    #   - .env
+    #   - stack.env
     environment:
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
       - ADMIN_CHAT_ID=${ADMIN_CHAT_ID}
