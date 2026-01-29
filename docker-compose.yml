@@ -13,11 +13,12 @@ services:
     #   TELEGRAM_CHAT_ID: "12345678"
     #   ADMIN_CHAT_ID: "12345678"
     #   INTERVAL_MINUTES: 30
-    volumes:
-      # Mappa la cartella locale di Home Assistant dentro il container
-      # Sostituisci /homeassistant/telegrambot con il percorso REALE sul tuo host se diverso
-      # In Portainer Add-on su HA, di solito /config è mappato.
-      # Se usi "Stacks" in Portainer:
-      - /homeassistant/telegrambot:/app
-      # Oppure se vuoi mappare solo i file json per persistenza:
-      # - /homeassistant/telegrambot/subscribers.json:/app/subscribers.json
+    # volumes:
+    #   - nelculo_data:/app/data
+      
+    command: >
+      sh -c "pip install requests Pillow python-telegram-bot[job-queue] beautifulsoup4 lxml &&
+             python main.py"
+
+# volumes:
+#   nelculo_data:

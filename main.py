@@ -20,7 +20,7 @@ ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID", "160104002")
 INTERVAL_MINUTES = int(os.getenv("INTERVAL_MINUTES", "30"))
 INTERVAL_SECONDS = INTERVAL_MINUTES * 60
 LATEST_IMAGE_PATH = "current_post.jpg"
-SUBSCRIBERS_FILE = "/app/data/subscribers.json" if os.path.exists("/app/data") else "subscribers.json"
+SUBSCRIBERS_FILE = "subscribers.json"
 
 # --- Subscribers Management ---
 
