@@ -5,3 +5,4 @@ beautifulsoup4
 lxml
 tmdbv3api
 python-dotenv
+duckduckgo-search

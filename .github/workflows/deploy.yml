@@ -1,0 +1,21 @@
+name: Deploy to Portainer
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Portainer Webhook
+        run: |
+          # Use the secret if available, otherwise try the URL provided (will fail if local)
+          WEBHOOK_URL="${{ secrets.PORTAINER_WEBHOOK }}"
+          if [ -z "$WEBHOOK_URL" ]; then
+            echo "Warning: PORTAINER_WEBHOOK secret is not set. Using the hardcoded URL (might fail if local)."
+            WEBHOOK_URL="http://homeassistant.local:8123/api/stacks/webhooks/b7aa1022-b9a9-4f32-a63b-e01ebb25b362"
+          fi
+          
+          echo "Triggering webhook..."
+          curl -X POST "$WEBHOOK_URL"

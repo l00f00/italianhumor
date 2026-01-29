@@ -8,6 +8,7 @@ from image_generator import create_image
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, JobQueue
 from tmdbv3api import TMDb, Movie, TV, Discover
+from duckduckgo_search import DDGS
 
 # Setup Logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -67,6 +68,7 @@ def get_random_movie_or_tv():
     """
     if not TMDB_API_KEY:
         logger.warning("TMDB_API_KEY mancante! Impossibile recuperare immagini.")
+        # If API key is missing, return None title so we fallback to local list + web search
         return None, None
         
     try:
@@ -95,8 +97,12 @@ def get_random_movie_or_tv():
                     poster_url = f"https://image.tmdb.org/t/p/original{poster_path}"
                     return title, poster_url
             
-            # If loop finishes without returning, fallback to the last one (even if no poster, but unlikely)
-            logger.warning(f"Nessun poster trovato dopo 5 tentativi a pagina {page}")
+            # If loop finishes without returning, still return a title if we found one, so we can search web
+            # Pick the last item checked
+            item = random.choice(results)
+            title = getattr(item, 'title', getattr(item, 'name', 'Unknown'))
+            logger.warning(f"Nessun poster TMDB trovato dopo 5 tentativi a pagina {page}. Uso titolo '{title}' e cercherò sul web.")
+            return title, None
             
     except Exception as e:
         logger.error(f"Error fetching from TMDB: {e}")
@@ -129,11 +135,47 @@ def get_poster_from_scraping(title):
         logger.error(f"Error scraping poster: {e}")
     return None
 
+def get_poster_from_web(title):
+    """
+    Search for a movie poster on DuckDuckGo Images.
+    """
+    try:
+        search_query = f"{title} locandina film poster"
+        logger.info(f"Searching web for poster: {search_query}")
+        
+        with DDGS() as ddgs:
+            # Search for images, max 1 result
+            results = list(ddgs.images(
+                keywords=search_query,
+                region="it-it",
+                safesearch="off",
+                size="Large",
+                type_image="photo",
+                max_results=1
+            ))
+            
+            if results:
+                image_url = results[0].get('image')
+                logger.info(f"Web search found image: {image_url}")
+                return image_url
+            else:
+                logger.warning("Web search found no images.")
+                
+    except Exception as e:
+        logger.error(f"Error searching web for poster: {e}")
+    
+    return None
+
 def get_content_data():
     # 1. Try TMDB API first
     title, poster_url = get_random_movie_or_tv()
     
-    # 2. Fallback to local files + Scraping
+    # 2. If we have a title but no poster, try Web Search (The "Simple" Fallback)
+    if title and not poster_url:
+        logger.info(f"TMDB failed to give poster for '{title}'. Trying Web Search...")
+        poster_url = get_poster_from_web(title)
+
+    # 3. Fallback to local files + Web Search fallback
     if not title:
         logger.info("Using local content fallback")
         try:
@@ -147,8 +189,8 @@ def get_content_data():
             
             if content_list:
                 title = random.choice(content_list)
-                # Now scrape the poster for this local title
-                poster_url = get_poster_from_scraping(title)
+                # Now scrape the poster for this local title using Web Search (better than scraping TMDB html)
+                poster_url = get_poster_from_web(title)
             else:
                 title = "Titolo Default"
                 poster_url = None
