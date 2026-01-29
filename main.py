@@ -66,6 +66,7 @@ def get_random_movie_or_tv():
     Only works if API Key is valid.
     """
     if not TMDB_API_KEY:
+        logger.warning("TMDB_API_KEY mancante! Impossibile recuperare immagini.")
         return None, None
         
     try:
@@ -73,7 +74,8 @@ def get_random_movie_or_tv():
         is_movie = random.choice([True, False])
         
         # Random page (popular content usually goes up to 500 pages)
-        page = random.randint(1, 50) 
+        # Reduced max page to 20 to ensure higher quality/popularity and images
+        page = random.randint(1, 20) 
         
         if is_movie:
             movie = Movie()
@@ -83,17 +85,18 @@ def get_random_movie_or_tv():
             results = tv.popular(page=page)
             
         if results:
-            item = random.choice(results)
-            title = getattr(item, 'title', getattr(item, 'name', 'Unknown'))
-            poster_path = getattr(item, 'poster_path', None)
-            
-            # Get High Res Poster
-            if poster_path:
-                poster_url = f"https://image.tmdb.org/t/p/original{poster_path}"
-            else:
-                poster_url = None
+            # Try up to 5 times to find an item with a poster
+            for _ in range(5):
+                item = random.choice(results)
+                poster_path = getattr(item, 'poster_path', None)
                 
-            return title, poster_url
+                if poster_path:
+                    title = getattr(item, 'title', getattr(item, 'name', 'Unknown'))
+                    poster_url = f"https://image.tmdb.org/t/p/original{poster_path}"
+                    return title, poster_url
+            
+            # If loop finishes without returning, fallback to the last one (even if no poster, but unlikely)
+            logger.warning(f"Nessun poster trovato dopo 5 tentativi a pagina {page}")
             
     except Exception as e:
         logger.error(f"Error fetching from TMDB: {e}")
@@ -194,7 +197,12 @@ def is_admin(update: Update):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     add_subscriber(chat_id)
-    msg = f"🍑 Bot Avviato!\nPubblicherò un film nel c*lo ogni {INTERVAL_MINUTES} minuti."
+    msg = (
+        f"🍑 *Benvenuto in NelCuloBot!* 🍑\n\n"
+        f"Preparati a vedere i grandi classici del cinema come non li hai mai visti (o sentiti) prima.\n"
+        f"Pubblicherò un capolavoro rovinato ogni {INTERVAL_MINUTES} minuti.\n\n"
+        "Tieniti forte! 🚀"
+    )
     if is_admin(update):
         msg += "\n\n👑 Comandi Admin: /force, /users, /restart"
     
