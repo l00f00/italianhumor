@@ -1,0 +1,23 @@
+version: '3'
+services:
+  nelculobot:
+    build: .
+    container_name: nelculobot
+    restart: unless-stopped
+    # ports:
+    #   - "5000:5000" # Flask rimosso, non serve esporre porte
+    # env_file:
+    #   - .env
+    environment:
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - ADMIN_CHAT_ID=${ADMIN_CHAT_ID}
+      - INTERVAL_MINUTES=${INTERVAL_MINUTES}
+    volumes:
+      # Mappa la cartella locale di Home Assistant dentro il container
+      # Sostituisci /homeassistant/telegrambot con il percorso REALE sul tuo host se diverso
+      # In Portainer Add-on su HA, di solito /config è mappato.
+      # Se usi "Stacks" in Portainer:
+      - /homeassistant/telegrambot:/app
+      # Oppure se vuoi mappare solo i file json per persistenza:
+      # - /homeassistant/telegrambot/subscribers.json:/app/subscribers.json

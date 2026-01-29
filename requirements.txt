@@ -1,0 +1,6 @@
+requests
+Pillow
+python-telegram-bot[job-queue]
+beautifulsoup4
+lxml
+python-dotenv
