@@ -8,11 +8,11 @@ services:
     #   - "5000:5000" # Flask rimosso, non serve esporre porte
     # env_file:
     #   - .env
-    environment:
-      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
-      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
-      - ADMIN_CHAT_ID=${ADMIN_CHAT_ID}
-      - INTERVAL_MINUTES=${INTERVAL_MINUTES}
+    # environment: # Commentato per usare .env
+    #   TELEGRAM_TOKEN: "123456:ABC-DEF"
+    #   TELEGRAM_CHAT_ID: "12345678"
+    #   ADMIN_CHAT_ID: "12345678"
+    #   INTERVAL_MINUTES: 30
     volumes:
       # Mappa la cartella locale di Home Assistant dentro il container
       # Sostituisci /homeassistant/telegrambot con il percorso REALE sul tuo host se diverso
