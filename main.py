@@ -194,10 +194,18 @@ def is_admin(update: Update):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     add_subscriber(chat_id)
-    msg = f"🍑 Bot Avviato!\nPubblicherò un film nel c*lo ogni {INTERVAL_MINUTES} minuti.\nTitoli infiniti da TMDB!"
+    msg = f"🍑 Bot Avviato!\nPubblicherò un film nel c*lo ogni {INTERVAL_MINUTES} minuti."
     if is_admin(update):
         msg += "\n\n👑 Comandi Admin: /force, /users, /restart"
-    await context.bot.send_message(chat_id=chat_id, text=msg)
+    
+    # Debug info for everyone
+    msg += f"\n\n🆔 Tuo ID: `{chat_id}`"
+    
+    await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode='Markdown')
+
+async def my_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    await context.bot.send_message(chat_id=chat_id, text=f"🆔 Il tuo ID è: `{chat_id}`", parse_mode='Markdown')
 
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
@@ -232,6 +240,7 @@ if __name__ == "__main__":
 
     application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("id", my_id))
     application.add_handler(CommandHandler("stop", stop))
     application.add_handler(CommandHandler("force", force))
     application.add_handler(CommandHandler("users", users))
