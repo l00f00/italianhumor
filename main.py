@@ -17,7 +17,10 @@ logger = logging.getLogger(__name__)
 # Configuration
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID")
-INTERVAL_MINUTES = int(os.getenv("INTERVAL_MINUTES", "30"))
+# 6 posts a day = 24h / 6 = every 4 hours = 240 minutes
+# Default interval if not set in env
+DEFAULT_INTERVAL_MINUTES = 240 
+INTERVAL_MINUTES = int(os.getenv("INTERVAL_MINUTES", str(DEFAULT_INTERVAL_MINUTES)))
 INTERVAL_SECONDS = INTERVAL_MINUTES * 60
 LATEST_IMAGE_PATH = "current_post.jpg"
 SUBSCRIBERS_FILE = "subscribers.json"
@@ -196,6 +199,24 @@ def get_random_italian_title():
             if any(word in lower_title for word in forbidden_words):
                 logger.info(f"Skipped unsafe title: {clean_title}")
                 continue
+            
+            # 3. Recency Bias (Prefer movies from 1994-2026)
+            # Try to extract year from the original string "Title (film YYYY)"
+            try:
+                # Extract year if present in parentheses e.g. "Matrix (film 1999)"
+                if "(film " in title:
+                    year_part = title.split("(film ")[1].replace(")", "")
+                    if year_part.isdigit():
+                        year = int(year_part)
+                        # Logic: If year is outside 1994-2026, flip a coin to see if we skip it
+                        # This makes recent movies MORE likely but doesn't ban old ones completely
+                        if year < 1994 or year > 2026:
+                            # 70% chance to skip old movies to prefer recent ones
+                            if random.random() < 0.7: 
+                                logger.info(f"Skipped old movie (bias): {clean_title} ({year})")
+                                continue
+            except Exception:
+                pass # If year parsing fails, just keep the title
                 
             return clean_title
             
@@ -269,11 +290,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = (
         f"🍑 *Benvenuto in NelCuloBot2!* 🍑\n\n"
         f"Preparati a vedere i grandi classici del cinema come non li hai mai visti (o sentiti) prima.\n"
-        f"Pubblicherò un capolavoro rovinato ogni {INTERVAL_MINUTES} minuti.\n\n"
+        f"Pubblicherò un capolavoro rovinato circa 6 volte al giorno.\n\n"
         "Tieniti forte! 🚀"
     )
     if is_admin(update):
-        msg += "\n\n👑 Comandi Admin: /force, /users, /restart"
+        msg += "\n\n👑 Comandi Admin: /force, /users, /restart, /broadcast <messaggio>"
     
     # Debug info for everyone
     msg += f"\n\n🆔 Tuo ID: `{chat_id}`"
@@ -317,6 +338,33 @@ async def users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     subs = load_subscribers()
     await context.bot.send_message(chat_id=update.effective_chat.id, text=f"👥 Utenti: {len(subs)}\n{list(subs)}")
 
+async def broadcast_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Admin command to send a text message to all subscribers.
+    Usage: /broadcast <message>
+    """
+    if not is_admin(update):
+        return
+        
+    if not context.args:
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="⚠️ Uso: /broadcast <messaggio>")
+        return
+
+    message = " ".join(context.args)
+    subscribers = load_subscribers()
+    
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=f"📣 Invio a {len(subscribers)} utenti...")
+    
+    count = 0
+    for chat_id in subscribers:
+        try:
+            await context.bot.send_message(chat_id=chat_id, text=f"📢 *COMUNICAZIONE UFFICIALE:*\n\n{message}", parse_mode='Markdown')
+            count += 1
+        except Exception as e:
+            logger.error(f"Failed to broadcast to {chat_id}: {e}")
+            
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=f"✅ Inviato correttamente a {count}/{len(subscribers)} utenti.")
+
 async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         return
@@ -345,6 +393,7 @@ if __name__ == "__main__":
         application.add_handler(CommandHandler("stop", stop))
         application.add_handler(CommandHandler("force", force))
         application.add_handler(CommandHandler("users", users))
+        application.add_handler(CommandHandler("broadcast", broadcast_message))
         application.add_handler(CommandHandler("restart", restart))
         
         # Job Queue
