@@ -294,7 +294,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Tieniti forte! 🚀"
     )
     if is_admin(update):
-        msg += "\n\n👑 Comandi Admin: /force, /users, /restart, /broadcast <messaggio>"
+        msg += "\n\n👑 Comandi Admin: /force, /users, /restart, /broadcast, /import_subs, /test_title"
     
     # Debug info for everyone
     msg += f"\n\n🆔 Tuo ID: `{chat_id}`"
@@ -365,6 +365,69 @@ async def broadcast_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
     await context.bot.send_message(chat_id=update.effective_chat.id, text=f"✅ Inviato correttamente a {count}/{len(subscribers)} utenti.")
 
+async def import_subs(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Admin command to import subscribers from a list (JSON or space-separated).
+    Usage: /import_subs 123 456 789 or /import_subs ["123", "456"]
+    """
+    if not is_admin(update):
+        return
+    
+    if not context.args:
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="⚠️ Uso: /import_subs ID1 ID2 ... oppure incolla una lista JSON")
+        return
+
+    # Join args to get the full string
+    raw_input = " ".join(context.args)
+    
+    new_subs = set()
+    
+    # Try parsing as JSON first
+    try:
+        json_subs = json.loads(raw_input)
+        if isinstance(json_subs, list):
+            for s in json_subs:
+                new_subs.add(str(s))
+    except json.JSONDecodeError:
+        # Fallback: treat as space/comma separated
+        cleaned = raw_input.replace(",", " ").replace("[", " ").replace("]", " ").replace("'", " ").replace('"', " ")
+        parts = cleaned.split()
+        for p in parts:
+            if p.strip().isdigit():
+                new_subs.add(p.strip())
+
+    if not new_subs:
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="❌ Nessun ID valido trovato.")
+        return
+
+    current_subs = load_subscribers()
+    initial_count = len(current_subs)
+    
+    current_subs.update(new_subs)
+    save_subscribers(current_subs)
+    
+    added_count = len(current_subs) - initial_count
+    
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id, 
+        text=f"✅ Importati {added_count} nuovi iscritti.\n👥 Totale attuale: {len(current_subs)}"
+    )
+
+async def test_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Admin command to test title generation without image.
+    """
+    if not is_admin(update):
+        return
+        
+    title = get_random_italian_title()
+    if not title:
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="❌ Errore nel recupero titolo (DB vuoto?)")
+        return
+        
+    ruined = f"{title} nel c*lo"
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=f"🧪 *Test Titolo:*\n\nOriginale: {title}\nRovinato: {ruined}", parse_mode='Markdown')
+
 async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         return
@@ -394,6 +457,8 @@ if __name__ == "__main__":
         application.add_handler(CommandHandler("force", force))
         application.add_handler(CommandHandler("users", users))
         application.add_handler(CommandHandler("broadcast", broadcast_message))
+        application.add_handler(CommandHandler("import_subs", import_subs))
+        application.add_handler(CommandHandler("test_title", test_title))
         application.add_handler(CommandHandler("restart", restart))
         
         # Job Queue
