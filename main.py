@@ -21,9 +21,20 @@ ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID")
 # Default interval if not set in env
 DEFAULT_INTERVAL_MINUTES = 240 
 INTERVAL_MINUTES = int(os.getenv("INTERVAL_MINUTES", str(DEFAULT_INTERVAL_MINUTES)))
+
+# Check config override
+try:
+    _config = load_config()
+    if 'interval_minutes' in _config:
+        INTERVAL_MINUTES = int(_config['interval_minutes'])
+        logger.info(f"Loaded interval from config: {INTERVAL_MINUTES} minutes")
+except Exception as e:
+    logger.error(f"Error loading config: {e}")
+
 INTERVAL_SECONDS = INTERVAL_MINUTES * 60
 LATEST_IMAGE_PATH = "current_post.jpg"
 SUBSCRIBERS_FILE = "subscribers.json"
+CONFIG_FILE = "bot_config.json"
 MOVIES_FILE = "italian_movies_list.json" # New file with 9900+ titles
 
 # TMDB Configuration
@@ -35,6 +46,20 @@ TMDB_API_KEY = os.getenv("TMDB_API_KEY", "e4f9e61f6dd628033d8fd6d42746f972") # U
 tmdb = TMDb()
 tmdb.api_key = TMDB_API_KEY
 tmdb.language = 'it-IT'
+
+def load_config():
+    config = {}
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r') as f:
+                config = json.load(f)
+        except:
+            pass
+    return config
+
+def save_config(config):
+    with open(CONFIG_FILE, 'w') as f:
+        json.dump(config, f)
 
 # --- Subscribers Management ---
 
@@ -294,7 +319,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Tieniti forte! 🚀"
     )
     if is_admin(update):
-        msg += "\n\n👑 Comandi Admin: /force, /users, /restart, /broadcast, /import_subs, /test_title"
+        msg += "\n\n👑 Comandi Admin: /force, /users, /restart, /broadcast, /import_subs, /test_title, /set_interval"
     
     # Debug info for everyone
     msg += f"\n\n🆔 Tuo ID: `{chat_id}`"
@@ -428,6 +453,45 @@ async def test_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ruined = f"{title} nel c*lo"
     await context.bot.send_message(chat_id=update.effective_chat.id, text=f"🧪 *Test Titolo:*\n\nOriginale: {title}\nRovinato: {ruined}", parse_mode='Markdown')
 
+async def set_interval(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Admin command to change the posting interval.
+    Usage: /set_interval <minutes>
+    """
+    if not is_admin(update):
+        return
+        
+    if not context.args or not context.args[0].isdigit():
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="⚠️ Uso: /set_interval <minuti>\nEsempio: /set_interval 240 (per 4 ore)")
+        return
+        
+    new_interval = int(context.args[0])
+    if new_interval < 1:
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="❌ L'intervallo deve essere almeno 1 minuto.")
+        return
+        
+    # Remove existing jobs
+    current_jobs = context.job_queue.get_jobs_by_name('broadcast_job')
+    for job in current_jobs:
+        job.schedule_removal()
+        
+    # Schedule new job
+    context.job_queue.run_repeating(generate_and_broadcast, interval=new_interval * 60, first=10, name='broadcast_job')
+    
+    # Save to config
+    config = load_config()
+    config['interval_minutes'] = new_interval
+    save_config(config)
+    
+    # Update global var for display purposes (though restart will reload it properly)
+    global INTERVAL_MINUTES
+    INTERVAL_MINUTES = new_interval
+    
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id, 
+        text=f"✅ Intervallo aggiornato a {new_interval} minuti.\nIl prossimo post arriverà tra pochi secondi (reset timer)."
+    )
+
 async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         return
@@ -459,6 +523,7 @@ if __name__ == "__main__":
         application.add_handler(CommandHandler("broadcast", broadcast_message))
         application.add_handler(CommandHandler("import_subs", import_subs))
         application.add_handler(CommandHandler("test_title", test_title))
+        application.add_handler(CommandHandler("set_interval", set_interval))
         application.add_handler(CommandHandler("restart", restart))
         
         # Job Queue
