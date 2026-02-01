@@ -6,7 +6,7 @@ import logging
 import sys
 from image_generator import create_image
 from telegram import Update, BotCommand
-from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, JobQueue
+from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, JobQueue, TypeHandler
 from tmdbv3api import TMDb, Movie, TV, Discover
 from duckduckgo_search import DDGS
 
@@ -498,6 +498,145 @@ async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=update.effective_chat.id, text="🔄 Riavvio...")
     os.execv(sys.executable, ['python'] + sys.argv)
 
+async def handle_reactions(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Notifies admin when a user reacts to a message.
+    """
+    try:
+        if not update.message_reaction:
+            return
+
+        user = update.message_reaction.user
+        chat_id = update.message_reaction.chat.id
+        message_id = update.message_reaction.message_id
+        
+        # Get the new reaction (if any)
+        new_reaction = update.message_reaction.new_reaction
+        emoji = new_reaction[0].emoji if new_reaction else "reaction removed"
+        
+        if not user:
+            return
+
+        # Don't notify if admin reacts (spam prevention)
+        if str(user.id) == str(ADMIN_CHAT_ID):
+            return
+
+        user_name = f"@{user.username}" if user.username else user.full_name
+        
+        msg = (
+            f"🔔 *Nuova Reazione!* 🔔\n\n"
+            f"👤 Utente: {user_name}\n"
+            f"😍 Reazione: {emoji}\n"
+            f"🔗 [Vai al messaggio](https://t.me/c/{str(chat_id).replace('-100', '')}/{message_id})"
+        )
+        
+        if ADMIN_CHAT_ID:
+            await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=msg, parse_mode='Markdown')
+            
+    except Exception as e:
+        logger.error(f"Error handling reaction: {e}")
+
+async def suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Allow users to suggest a title.
+    Usage: /suggest Matrix
+    """
+    if not context.args:
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="⚠️ Uso: /suggest <Titolo del film>")
+        return
+
+    title_suggestion = " ".join(context.args)
+    user = update.effective_user
+    user_name = f"@{user.username}" if user.username else user.full_name
+    user_id = user.id
+
+    # Confirm to user
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id, 
+        text=f"✅ Grazie {user.first_name}! Ho inviato il tuo suggerimento all'admin: *{title_suggestion}*"
+    , parse_mode='Markdown')
+
+    # Notify Admin
+    if ADMIN_CHAT_ID:
+        clean_title = title_suggestion.replace("'", "").replace('"', "")
+        admin_msg = (
+            f"💡 *Nuovo Suggerimento!* 💡\n\n"
+            f"👤 Utente: {user_name} (`{user_id}`)\n"
+            f"🎬 Titolo: *{title_suggestion}*\n\n"
+            f"Pubblica subito con:\n`/publish {title_suggestion}`\n\n"
+            f"Pubblica citando l'utente:\n`/publish_credit {user_name} {title_suggestion}`"
+        )
+        await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=admin_msg, parse_mode='Markdown')
+
+async def publish_custom(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Admin command to publish a specific title.
+    Usage: /publish Matrix
+    """
+    if not is_admin(update):
+        return
+        
+    if not context.args:
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="⚠️ Uso: /publish <Titolo>")
+        return
+
+    title = " ".join(context.args)
+    await process_custom_publish(update, context, title)
+
+async def publish_credit(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Admin command to publish a specific title with credit.
+    Usage: /publish_credit @username Matrix
+    """
+    if not is_admin(update):
+        return
+        
+    if len(context.args) < 2:
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="⚠️ Uso: /publish_credit <Utente> <Titolo>")
+        return
+
+    user_credit = context.args[0]
+    title = " ".join(context.args[1:])
+    
+    await process_custom_publish(update, context, title, credit=user_credit)
+
+async def process_custom_publish(update: Update, context: ContextTypes.DEFAULT_TYPE, title: str, credit: str = None):
+    chat_id = update.effective_chat.id
+    await context.bot.send_message(chat_id=chat_id, text=f"⏳ Elaborazione di: *{title}*...", parse_mode='Markdown')
+    
+    # 1. Search Poster
+    poster_url = get_poster_from_web(title)
+    if not poster_url:
+        await context.bot.send_message(chat_id=chat_id, text="⚠️ Nessuna copertina trovata sul web. Uso background generico.")
+    
+    # 2. Ruin Title
+    ruined_title = f"{title} nel c*lo"
+    
+    # 3. Generate Image
+    try:
+        create_image(ruined_title, LATEST_IMAGE_PATH, background_url=poster_url)
+    except Exception as e:
+        await context.bot.send_message(chat_id=chat_id, text=f"❌ Errore generazione immagine: {e}")
+        return
+
+    # 4. Broadcast
+    subscribers = load_subscribers()
+    await context.bot.send_message(chat_id=chat_id, text=f"📣 Invio a {len(subscribers)} utenti...")
+    
+    caption = ruined_title
+    if credit:
+        caption += f"\n\n💡 Suggerito da: {credit}"
+
+    count = 0
+    for sub_id in subscribers:
+        try:
+            await context.bot.send_photo(chat_id=sub_id, photo=open(LATEST_IMAGE_PATH, 'rb'), caption=caption)
+            count += 1
+        except Exception as e:
+            logger.error(f"Failed to send to {sub_id}: {e}")
+
+    await context.bot.send_message(chat_id=chat_id, text=f"✅ Pubblicato con successo a {count} utenti!")
+
 async def post_init(application: ApplicationBuilder):
     """
     Setup commands automatically on startup.
@@ -505,11 +644,14 @@ async def post_init(application: ApplicationBuilder):
     commands = [
         BotCommand("start", "Avvia il bot e iscriviti"),
         BotCommand("stop", "Disiscriviti dal bot"),
+        BotCommand("suggest", "Suggerisci un titolo"),
         BotCommand("id", "Mostra il tuo Telegram ID"),
         BotCommand("force", "(Admin) Forza l'invio di un post"),
         BotCommand("users", "(Admin) Lista ID iscritti"),
         BotCommand("broadcast", "(Admin) Invia messaggio a tutti"),
         BotCommand("import_subs", "(Admin) Importa iscritti"),
+        BotCommand("publish", "(Admin) Pubblica titolo custom"),
+        BotCommand("publish_credit", "(Admin) Pubblica con credit"),
         BotCommand("test_title", "(Admin) Test generazione titolo"),
         BotCommand("set_interval", "(Admin) Imposta frequenza post"),
         BotCommand("restart", "(Admin) Riavvia il bot"),
@@ -537,13 +679,21 @@ if __name__ == "__main__":
         application.add_handler(CommandHandler("start", start))
         application.add_handler(CommandHandler("id", my_id))
         application.add_handler(CommandHandler("stop", stop))
+        application.add_handler(CommandHandler("suggest", suggest))
+        
+        # Admin Handlers
         application.add_handler(CommandHandler("force", force))
         application.add_handler(CommandHandler("users", users))
         application.add_handler(CommandHandler("broadcast", broadcast_message))
         application.add_handler(CommandHandler("import_subs", import_subs))
+        application.add_handler(CommandHandler("publish", publish_custom))
+        application.add_handler(CommandHandler("publish_credit", publish_credit))
         application.add_handler(CommandHandler("test_title", test_title))
         application.add_handler(CommandHandler("set_interval", set_interval))
         application.add_handler(CommandHandler("restart", restart))
+        
+        # Reaction Handler
+        application.add_handler(TypeHandler(Update, handle_reactions))
         
         # Job Queue
         if application.job_queue:
