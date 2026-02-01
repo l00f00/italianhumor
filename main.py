@@ -5,7 +5,7 @@ import requests
 import logging
 import sys
 from image_generator import create_image
-from telegram import Update
+from telegram import Update, BotCommand
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, JobQueue
 from tmdbv3api import TMDb, Movie, TV, Discover
 from duckduckgo_search import DDGS
@@ -498,6 +498,25 @@ async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=update.effective_chat.id, text="🔄 Riavvio...")
     os.execv(sys.executable, ['python'] + sys.argv)
 
+async def post_init(application: ApplicationBuilder):
+    """
+    Setup commands automatically on startup.
+    """
+    commands = [
+        BotCommand("start", "Avvia il bot e iscriviti"),
+        BotCommand("stop", "Disiscriviti dal bot"),
+        BotCommand("id", "Mostra il tuo Telegram ID"),
+        BotCommand("force", "(Admin) Forza l'invio di un post"),
+        BotCommand("users", "(Admin) Lista ID iscritti"),
+        BotCommand("broadcast", "(Admin) Invia messaggio a tutti"),
+        BotCommand("import_subs", "(Admin) Importa iscritti"),
+        BotCommand("test_title", "(Admin) Test generazione titolo"),
+        BotCommand("set_interval", "(Admin) Imposta frequenza post"),
+        BotCommand("restart", "(Admin) Riavvia il bot"),
+    ]
+    await application.bot.set_my_commands(commands)
+    logger.info("Comandi bot aggiornati su Telegram!")
+
 if __name__ == "__main__":
     if not TELEGRAM_TOKEN:
         logger.error("❌ ERRORE CRITICO: Variabile d'ambiente TELEGRAM_TOKEN mancante!")
@@ -512,7 +531,7 @@ if __name__ == "__main__":
         add_subscriber(ADMIN_CHAT_ID)
 
     try:
-        application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+        application = ApplicationBuilder().token(TELEGRAM_TOKEN).post_init(post_init).build()
         
         # Handlers
         application.add_handler(CommandHandler("start", start))
