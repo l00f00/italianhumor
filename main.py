@@ -17,9 +17,9 @@ logger = logging.getLogger(__name__)
 # Configuration
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID")
-# 6 posts a day = 24h / 6 = every 4 hours = 240 minutes
 # Default interval if not set in env
-DEFAULT_INTERVAL_MINUTES = 240 
+# 5 hours = 300 minutes
+DEFAULT_INTERVAL_MINUTES = 300 
 INTERVAL_MINUTES = int(os.getenv("INTERVAL_MINUTES", str(DEFAULT_INTERVAL_MINUTES)))
 
 # Check config override
