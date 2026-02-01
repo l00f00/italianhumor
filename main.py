@@ -177,7 +177,7 @@ def get_poster_from_web(title):
             results = list(ddgs.images(
                 keywords=search_query,
                 region="it-it",
-                safesearch="off",
+                safesearch="on", # Strict SafeSearch
                 size="Large",
                 type_image="photo",
                 max_results=1
