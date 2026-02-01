@@ -3,11 +3,13 @@
 Un bot Telegram irriverente che prende titoli di film e serie TV famosi e aggiunge "nel c*lo" alla fine, creando locandine personalizzate.
 
 ## Features
-- 🎬 Genera titoli "rovinati" usando l'API di TMDB o una lista locale.
+- 🎬 Genera titoli "rovinati" usando una lista curata di 10.000 film italiani o l'API di TMDB.
 - 🖼️ Scarica la locandina originale da TMDB o cerca su DuckDuckGo se manca.
-- 📢 Pubblica automaticamente su Telegram a intervalli regolari.
+- 📢 Pubblica automaticamente su Telegram a intervalli regolari (default: 5 ore).
+- 💡 **Suggerimenti Utenti:** Gli utenti possono proporre titoli con `/suggest`.
+- 😍 **Reazioni:** Notifica agli admin quando gli utenti reagiscono ai post.
 - 👥 Supporta iscritti multipli (`/start`, `/stop`).
-- 👑 Comandi Admin (`/force`, `/users`, `/restart`).
+- 👑 Comandi Admin avanzati (`/force`, `/broadcast`, `/publish`, `/import_subs`).
 - 🐳 Pronto per Docker e Home Assistant.
 
 ## Setup Rapido (Docker/Portainer)
