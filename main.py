@@ -33,8 +33,8 @@ except Exception as e:
 
 INTERVAL_SECONDS = INTERVAL_MINUTES * 60
 LATEST_IMAGE_PATH = "current_post.jpg"
-SUBSCRIBERS_FILE = "subscribers.json"
-CONFIG_FILE = "bot_config.json"
+SUBSCRIBERS_FILE = "/data/subscribers.json" if os.path.exists("/data") else "subscribers.json"
+CONFIG_FILE = "/data/bot_config.json" if os.path.exists("/data") else "bot_config.json"
 MOVIES_FILE = "italian_movies_list.json" # New file with 9900+ titles
 
 # TMDB Configuration
@@ -476,7 +476,9 @@ async def set_interval(update: Update, context: ContextTypes.DEFAULT_TYPE):
         job.schedule_removal()
         
     # Schedule new job
-    context.job_queue.run_repeating(generate_and_broadcast, interval=new_interval * 60, first=10, name='broadcast_job')
+    # NOTE: We set 'first' to 'new_interval * 60' to avoid immediate posting.
+    # The user can always use /force to post immediately.
+    context.job_queue.run_repeating(generate_and_broadcast, interval=new_interval * 60, first=new_interval * 60, name='broadcast_job')
     
     # Save to config
     config = load_config()
@@ -489,7 +491,7 @@ async def set_interval(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await context.bot.send_message(
         chat_id=update.effective_chat.id, 
-        text=f"✅ Intervallo aggiornato a {new_interval} minuti.\nIl prossimo post arriverà tra pochi secondi (reset timer)."
+        text=f"✅ Intervallo aggiornato a {new_interval} minuti.\nIl prossimo post automatico sarà tra {new_interval} minuti."
     )
 
 async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
