@@ -12,12 +12,12 @@ services:
     environment:
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
       - ADMIN_CHAT_ID=${ADMIN_CHAT_ID}
-      - INTERVAL_MINUTES=${INTERVAL_MINUTES:-30}
-    # volumes:
-    #   - nelculo_data:/app/data
+      - INTERVAL_MINUTES=${INTERVAL_MINUTES:-300}
+    volumes:
+      - nelculo_data:/data
       
     # Use the default command from Dockerfile, or just python main.py
     command: python main.py
 
-# volumes:
-#   nelculo_data:
+volumes:
+  nelculo_data:
